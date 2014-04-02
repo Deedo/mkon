@@ -15,7 +15,7 @@ function init(config) {
 
 	//handle data function
 	function() {   
-		function drawEllipse(ctx, x0, y0, a, exc, lineWidth, color) {
+		function drawEllipse(ctx, x0, y0, a, exc, lineWidth, color,type) {
 			x0 += a * exc;
 			var r = a * (1 - exc*exc)/(1 + exc)
 			var x = x0 + r;
@@ -32,9 +32,20 @@ function init(config) {
 				i += 0.01 * Math.PI;
 			}
 			ctx.lineWidth = lineWidth;
-			ctx.strokeStyle = color;
-			ctx.closePath();
-			ctx.stroke();
+			if (type === "stroke") {
+				ctx.strokeStyle = color;
+				ctx.closePath();
+				ctx.stroke();
+			} else {
+				var grd = ctx.createRadialGradient(x0, y0, Math.abs(r-lineWidth), x0, y0, r);
+				// light blue
+				grd.addColorStop(1, color);
+				// dark blue
+				grd.addColorStop(0, 'DarkGrey');
+				ctx.fillStyle = grd;
+				ctx.closePath();
+				ctx.fill();
+			}
 		}
 		
 		//draw the ship icons
@@ -79,8 +90,7 @@ function init(config) {
 			return 0;
 		}
 		var t = $('#'+this.id);
-		var maxradius=180; //this is the max radius of the drawn orbit.
-	
+		
 		var Plane = document.getElementById("canvas"+this.id);
 		var Context = Plane.getContext('2d');
 
@@ -91,34 +101,46 @@ function init(config) {
 		var body = MKON.CONTENT.getVariable(req[4]);
 		
 		var bodyradius = getVBodyRadius(body);
-		var bodyradiuswithatmo = bodyradius + getVBodyAtmo(body);
-
-		var ratio = (2*maxradius / (per + apo + (2*bodyradius))); //do not round this 
+		var bodyatmoradius = getVBodyAtmo(body);
+		var bodyradiuswithatmo = bodyradius + bodyatmoradius;
 		var shipangle = -(trueano/190)* Math.PI; //in radians
-
+		
 		Context.save();
 		//clear the context
 		Context.clearRect(0,0,400,400);
 		Context.translate(200,200);
+		Context.font = "15pt BebasNeue";
 			
 		if (ecc < 1) { //The Orbit is closing... or at least not (hyper/para)boloid
-			//Draw the Orbit
-			drawEllipse(Context,0,0,maxradius,ecc,1,"YellowGreen"); 
+			var maxradius=180; //this is the max radius of the drawn orbit.
+			var ratio = (2*maxradius / (per + apo + (2*bodyradius))); //do not round this 
+			if (per < 0) {
+				var maxradius=360;
+				ratio = (2*maxradius / (per + apo + (2*bodyradius))); //do not round this 
+				Context.translate(200,0);
+			}
+			//Watch out for layers order
 			//Draw the body
-			drawEllipse(Context,ecc*maxradius,0,bodyradius*ratio,0,0.5,"White");
-			drawEllipse(Context,ecc*maxradius,0,bodyradiuswithatmo*ratio,0,0.1,"LightBlue");
+			drawEllipse(Context,ecc*maxradius,0,bodyradiuswithatmo*ratio,0,bodyatmoradius*ratio,"DarkBlue","fill");
+			//Draw the Atmo
+			drawEllipse(Context,ecc*maxradius,0,bodyradius*ratio,0,10,"LightGrey","fill");
 			//Draw the Ship
 			drawShip(Context,0,0,maxradius,ecc,shipangle);
 			//Draw the cute Ap and Pe icons
 			drawApAndPe(Context,maxradius);
-			
+			//Draw the Orbit
+			drawEllipse(Context,0,0,maxradius,ecc,1,"YellowGreen","stroke"); 
+
 			Context.fillStyle = "lightgrey";
-			Context.font = "15pt BebasNeue";
 			Context.translate(-200,-180);
-			Context.fillText("ORBITING " + body,0,0);
+			if (per < 0) {
+				Context.translate(-200,0);
+				Context.fillText("NEAR " + body,0,0);
+			} else {
+				Context.fillText("ORBITING " + body,0,0);
+			}
 		} else {
 			Context.fillStyle = "lightgrey";
-			Context.font = "15pt BebasNeue";
 			Context.translate(-200,-180);
 			Context.fillText("paraboloid orbits not yet implemented...",0,0);
 		}
